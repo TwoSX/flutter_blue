@@ -16,19 +16,23 @@ version '1.0-SNAPSHOT'
 
 buildscript {
     repositories {
+        maven { url 'https://maven.aliyun.com/nexus/content/groups/public/' }
+        maven { url 'https://maven.aliyun.com/nexus/content/repositories/jcenter' }
         google()
         jcenter()
         mavenLocal()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.3.0'
+        classpath 'com.android.tools.build:gradle:3.3.2'
         classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.8'
     }
 }
 
 rootProject.allprojects {
     repositories {
+        maven { url 'https://maven.aliyun.com/nexus/content/groups/public/' }
+        maven { url 'https://maven.aliyun.com/nexus/content/repositories/jcenter' }
         google()
         jcenter()
         mavenLocal()

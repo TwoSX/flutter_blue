@@ -48,6 +48,12 @@ class BluetoothDevice {
   Future disconnect() =>
       FlutterBlue.instance._channel.invokeMethod('disconnect', id.toString());
 
+  Future<int> redRssi(){
+    return FlutterBlue.instance._channel
+        .invokeMethod('readRssi', id.toString())
+        .then((o) => o as int);
+  }
+
   BehaviorSubject<List<BluetoothService>> _services =
       BehaviorSubject.seeded([]);
 

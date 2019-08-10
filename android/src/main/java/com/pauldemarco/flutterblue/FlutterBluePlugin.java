@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import androidx.core.app.ActivityCompat;
@@ -72,6 +73,8 @@ public class FlutterBluePlugin implements MethodCallHandler, RequestPermissionsR
     // Pending call and result for startScan, in the case where permissions are needed
     private MethodCall pendingCall;
     private Result pendingResult;
+
+    private Map<String, Result> rssiResults = new HashMap<>();
 
     /**
      * Plugin registration.
@@ -279,6 +282,22 @@ public class FlutterBluePlugin implements MethodCallHandler, RequestPermissionsR
                     p.addServices(ProtoMaker.from(gattServer.getDevice(), s, gattServer));
                 }
                 result.success(p.build().toByteArray());
+                break;
+            }
+
+            case "readRssi":{
+                String deviceId = (String)call.arguments;
+                BluetoothGatt gattServer = mGattServers.get(deviceId);
+                if(gattServer == null) {
+                    result.error("get_services_error", "no instance of BluetoothGatt, have you connected first?", null);
+                    return;
+                }
+                String id = gattServer.getDevice().getAddress();
+                rssiResults.put(id, result);
+                if (!gattServer.readRemoteRssi()){
+                    result.error("read_rssi_error", "BluetoothGatt.readRemoteRssi() is false", null);
+                    rssiResults.remove(id);
+                }
                 break;
             }
 
@@ -550,6 +569,7 @@ public class FlutterBluePlugin implements MethodCallHandler, RequestPermissionsR
         return descriptor;
     }
 
+
     private final StreamHandler stateHandler = new StreamHandler() {
         private EventSink sink;
 
@@ -808,8 +828,19 @@ public class FlutterBluePlugin implements MethodCallHandler, RequestPermissionsR
         }
 
         @Override
-        public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status) {
+        public void onReadRemoteRssi(final BluetoothGatt gatt, final int rssi, int status) {
             log(LogLevel.DEBUG, "[onReadRemoteRssi] rssi: " + rssi + " status: " + status);
+            final String id = gatt.getDevice().getAddress();
+            activity.runOnUiThread(
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            if (rssiResults.containsKey(id) && rssiResults.get(id) != null) {
+                                Objects.requireNonNull(rssiResults.get(id)).success(rssi);
+                                rssiResults.remove(id);
+                            }
+                        }
+                    });
         }
 
         @Override

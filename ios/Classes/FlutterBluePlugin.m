@@ -38,6 +38,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic) NSMutableArray *servicesThatNeedDiscovered;
 @property(nonatomic) NSMutableArray *characteristicsThatNeedDiscovered;
 @property(nonatomic) LogLevel logLevel;
+@property(nonatomic, strong) NSMutableDictionary *rssiResults;
 @end
 
 @implementation FlutterBluePlugin
@@ -50,6 +51,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
   instance.channel = channel;
   instance.centralManager = [[CBCentralManager alloc] initWithDelegate:instance queue:nil];
   instance.scannedPeripherals = [NSMutableDictionary new];
+  instance.rssiResults = [NSMutableDictionary new];
   instance.servicesThatNeedDiscovered = [NSMutableArray new];
   instance.characteristicsThatNeedDiscovered = [NSMutableArray new];
   instance.logLevel = emergency;
@@ -159,7 +161,16 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     } @catch(FlutterError *e) {
       result(e);
     }
-  } else if([@"readCharacteristic" isEqualToString:call.method]) {
+  } else if([@"readRssi" isEqualToString:call.method]){
+      NSString *remoteId = [call arguments];
+      @try {
+          CBPeripheral *peripheral = [self findPeripheral:remoteId];
+          [self.rssiResults setObject:result forKey: [peripheral.identifier UUIDString]];
+          [peripheral readRSSI];
+      } @catch(FlutterError *e) {
+          result(e);
+      }
+  }else if([@"readCharacteristic" isEqualToString:call.method]) {
     FlutterStandardTypedData *data = [call arguments];
     ProtosReadCharacteristicRequest *request = [[ProtosReadCharacteristicRequest alloc] initWithData:[data data] error:nil];
     NSString *remoteId = [request remoteId];
@@ -468,6 +479,22 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
   
   // Request a read
   [peripheral readValueForDescriptor:cccd];
+}
+
+- (void)peripheral:(CBPeripheral *)peripheral didReadRSSI:(NSNumber *)RSSI error:(NSError *)error {
+    NSLog(@"iOS信号强度: %@", RSSI);    
+    NSString *remoteId = [peripheral.identifier UUIDString];
+    FlutterResult result = _rssiResults[remoteId];
+    if(result){
+        if(error){
+            result([FlutterError errorWithCode:@"didReadRSSI_error"
+                                       message:@"didReadRSSI Error"
+                                       details:nil]);
+        }else{
+            result(RSSI);
+        }
+        [_rssiResults removeObjectForKey:remoteId];
+    }
 }
 
 - (void)peripheral:(CBPeripheral *)peripheral didUpdateValueForDescriptor:(CBDescriptor *)descriptor error:(NSError *)error {

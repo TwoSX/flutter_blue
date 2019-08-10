@@ -152,9 +152,11 @@ class FindDevicesScreen extends StatelessWidget {
 }
 
 class DeviceScreen extends StatelessWidget {
-  const DeviceScreen({Key key, this.device}) : super(key: key);
+  DeviceScreen({Key key, this.device}) : super(key: key);
 
   final BluetoothDevice device;
+
+  Timer _rssiTimer;
 
   List<Widget> _buildServiceTiles(List<BluetoothService> services) {
     return services
@@ -186,6 +188,17 @@ class DeviceScreen extends StatelessWidget {
         .toList();
   }
 
+  Timer _getRssi() {
+    return Timer.periodic(const Duration(milliseconds: 1000), (timer) {
+      device.redRssi().then((rssi) {
+        print("信号强度: $rssi");
+      }, onError: (e) {
+        print(e);
+        timer.cancel();
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -200,10 +213,17 @@ class DeviceScreen extends StatelessWidget {
               String text;
               switch (snapshot.data) {
                 case BluetoothDeviceState.connected:
+                  if (_rssiTimer != null) {
+                    _rssiTimer.cancel();
+                    _rssiTimer = null;
+                  }
+                  _rssiTimer = _getRssi();
                   onPressed = () => device.disconnect();
                   text = 'DISCONNECT';
                   break;
                 case BluetoothDeviceState.disconnected:
+                  _rssiTimer.cancel();
+                  _rssiTimer = null;
                   onPressed = () => device.connect();
                   text = 'CONNECT';
                   break;
