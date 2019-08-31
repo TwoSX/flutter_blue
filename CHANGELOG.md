@@ -1,3 +1,11 @@
+## 0.6.0+4
+
+* Fix duplicate characteristic notifications when connection lost.
+
+## 0.6.0+3
+
+* Fix duplicate characteristic notifications when reconnecting.
+
 ## 0.6.0+2
 
 * Add minimum SDK version of 18 for the plugin.

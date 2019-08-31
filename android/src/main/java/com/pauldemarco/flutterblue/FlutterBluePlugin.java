@@ -210,10 +210,12 @@ public class FlutterBluePlugin implements MethodCallHandler, RequestPermissionsR
 
                 // If device was connected to previously but is now disconnected, attempt a reconnect
                 if(mGattServers.containsKey(deviceId) && !isConnected) {
-                    if(!mGattServers.get(deviceId).connect()){
+                    if(mGattServers.get(deviceId).connect()){
+                        result.success(null);
+                    } else {
                         result.error("reconnect_error", "error when reconnecting to device", null);
-                        return;
                     }
+                    return;
                 }
 
                 // New request, connect and add gattServer to Map
@@ -231,9 +233,14 @@ public class FlutterBluePlugin implements MethodCallHandler, RequestPermissionsR
             case "disconnect":
             {
                 String deviceId = (String)call.arguments;
+                BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(deviceId);
+                int state = mBluetoothManager.getConnectionState(device, BluetoothProfile.GATT);
                 BluetoothGatt gattServer = mGattServers.remove(deviceId);
                 if(gattServer != null) {
                     gattServer.disconnect();
+                    if(state == BluetoothProfile.STATE_DISCONNECTED) {
+                        gattServer.close();
+                    }
                 }
                 result.success(null);
                 break;
