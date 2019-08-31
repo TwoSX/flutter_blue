@@ -591,6 +591,8 @@ public class FlutterBluePlugin implements MethodCallHandler, RequestPermissionsR
                     switch (state) {
                         case BluetoothAdapter.STATE_OFF:
                             sink.success(Protos.BluetoothState.newBuilder().setState(Protos.BluetoothState.State.OFF).build().toByteArray());
+                            // 蓝牙被关闭了。清空所有设备
+                            mGattServers.clear();
                             break;
                         case BluetoothAdapter.STATE_TURNING_OFF:
                             sink.success(Protos.BluetoothState.newBuilder().setState(Protos.BluetoothState.State.TURNING_OFF).build().toByteArray());
