@@ -86,7 +86,27 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     }
   } else if([@"startScan" isEqualToString:call.method]) {
     // Clear any existing scan results
-    [self.scannedPeripherals removeAllObjects];
+    // 直接清空会导致连接中的设备被踢掉，只能将未连接的设备去掉
+    NSArray *periphs = [self->_centralManager retrieveConnectedPeripheralsWithServices:@[[CBUUID UUIDWithString:@"1800"]]];
+      
+    if([periphs count] == 0){
+      [self.scannedPeripherals removeAllObjects];
+    }else{
+      NSMutableArray *connArr = [NSMutableArray array];
+      
+      for(CBPeripheral *p in periphs) {
+          [connArr addObject: [[p identifier] UUIDString]];
+      }
+      
+      NSArray *allKeys = [self.scannedPeripherals allKeys];
+      for (NSString *key in allKeys) {
+          if ([connArr containsObject: key] == NO) {
+              [self.scannedPeripherals removeObjectForKey:key];
+          }
+      }
+      
+    }
+    
     // TODO: Request Permission?
     FlutterStandardTypedData *data = [call arguments];
     ProtosScanSettings *request = [[ProtosScanSettings alloc] initWithData:[data data] error:nil];
