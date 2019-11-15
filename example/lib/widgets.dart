@@ -58,7 +58,7 @@ class ScanResultTile extends StatelessWidget {
   }
 
   String getNiceHexArray(List<int> bytes) {
-    return '${bytes.map((i) => i.toRadixString(16).padLeft(2, '0')).join(', ')}'
+    return '[${bytes.map((i) => i.toRadixString(16).padLeft(2, '0')).join(', ')}]'
         .toUpperCase();
   }
 
@@ -68,11 +68,10 @@ class ScanResultTile extends StatelessWidget {
     }
     List<String> res = [];
     data.forEach((id, bytes) {
-      var str = id.toRadixString(16).padLeft(4,'0');
       res.add(
-          '${str.substring(2,4)}:${str.substring(0,2)}:${bytes.map((i) => i.toRadixString(16).padLeft(2, '0')).join(':')}');
+          '${id.toRadixString(16).toUpperCase()}: ${getNiceHexArray(bytes)}');
     });
-    return res.join(', ').toUpperCase();
+    return res.join(', ');
   }
 
   String getNiceServiceData(Map<String, List<int>> data) {
@@ -88,7 +87,6 @@ class ScanResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print("${result.advertisementData.localName} -- ${result.advertisementData.manufacturerData}");
     return ExpansionTile(
       title: _buildTitle(context),
       leading: Text(result.rssi.toString()),

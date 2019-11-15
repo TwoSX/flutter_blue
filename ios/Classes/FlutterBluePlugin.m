@@ -51,10 +51,10 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
   instance.channel = channel;
   instance.centralManager = [[CBCentralManager alloc] initWithDelegate:instance queue:nil];
   instance.scannedPeripherals = [NSMutableDictionary new];
-  instance.rssiResults = [NSMutableDictionary new];
   instance.servicesThatNeedDiscovered = [NSMutableArray new];
   instance.characteristicsThatNeedDiscovered = [NSMutableArray new];
   instance.logLevel = emergency;
+  instance.rssiResults = [NSMutableDictionary new];
   
   // STATE
   FlutterBlueStreamHandler* stateStreamHandler = [[FlutterBlueStreamHandler alloc] init];
@@ -88,25 +88,23 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     // Clear any existing scan results
     // 直接清空会导致连接中的设备被踢掉，只能将未连接的设备去掉
     NSArray *periphs = [self->_centralManager retrieveConnectedPeripheralsWithServices:@[[CBUUID UUIDWithString:@"1800"]]];
-      
+
     if([periphs count] == 0){
-      [self.scannedPeripherals removeAllObjects];
+    [self.scannedPeripherals removeAllObjects];
     }else{
-      NSMutableArray *connArr = [NSMutableArray array];
-      
-      for(CBPeripheral *p in periphs) {
-          [connArr addObject: [[p identifier] UUIDString]];
-      }
-      
-      NSArray *allKeys = [self.scannedPeripherals allKeys];
-      for (NSString *key in allKeys) {
-          if ([connArr containsObject: key] == NO) {
-              [self.scannedPeripherals removeObjectForKey:key];
-          }
-      }
-      
+        NSMutableArray *connArr = [NSMutableArray array];
+
+        for(CBPeripheral *p in periphs) {
+            [connArr addObject: [[p identifier] UUIDString]];
+        }
+
+        NSArray *allKeys = [self.scannedPeripherals allKeys];
+        for (NSString *key in allKeys) {
+            if ([connArr containsObject: key] == NO) {
+                [self.scannedPeripherals removeObjectForKey:key];
+            }
+        }
     }
-    
     // TODO: Request Permission?
     FlutterStandardTypedData *data = [call arguments];
     ProtosScanSettings *request = [[ProtosScanSettings alloc] initWithData:[data data] error:nil];
@@ -125,7 +123,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
   } else if([@"getConnectedDevices" isEqualToString:call.method]) {
     // Cannot pass blank UUID list for security reasons. Assume all devices have the Generic Access service 0x1800
     NSArray *periphs = [self->_centralManager retrieveConnectedPeripheralsWithServices:@[[CBUUID UUIDWithString:@"1800"]]];
-    NSLog(@"getConnectedDevices periphs size: %d", [periphs count]);
+    NSLog(@"getConnectedDevices periphs size: %lu", [periphs count]);
     result([self toFlutterData:[self toConnectedDeviceResponseProto:periphs]]);
   } else if([@"connect" isEqualToString:call.method]) {
     FlutterStandardTypedData *data = [call arguments];
@@ -180,7 +178,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
       result([self toFlutterData:[self toServicesResultProto:peripheral]]);
     } @catch(FlutterError *e) {
       result(e);
-    }
+   }
   } else if([@"readRssi" isEqualToString:call.method]){
       NSString *remoteId = [call arguments];
       @try {
@@ -270,6 +268,17 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     } @catch(FlutterError *e) {
       result(e);
     }
+  } else if([@"mtu" isEqualToString:call.method]) {
+    NSString *remoteId = [call arguments];
+    @try {
+      CBPeripheral *peripheral = [self findPeripheral:remoteId];
+      uint32_t mtu = [self getMtu:peripheral];
+      result([self toFlutterData:[self toMtuSizeResponseProto:peripheral mtu:mtu]]);
+    } @catch(FlutterError *e) {
+      result(e);
+    }
+  } else if([@"requestMtu" isEqualToString:call.method]) {
+    result([FlutterError errorWithCode:@"requestMtu" message:@"iOS does not allow mtu requests to the peripheral" details:NULL]);
   } else {
     result(FlutterMethodNotImplemented);
   }
@@ -396,6 +405,10 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
   // Register self as delegate for peripheral
   peripheral.delegate = self;
   
+  // Send initial mtu size
+  uint32_t mtu = [self getMtu:peripheral];
+  [_channel invokeMethod:@"MtuSize" arguments:[self toFlutterData:[self toMtuSizeResponseProto:peripheral mtu:mtu]]];
+  
   // Send connection state
   [_channel invokeMethod:@"DeviceState" arguments:[self toFlutterData:[self toDeviceStateProto:peripheral state:peripheral.state]]];
 }
@@ -418,6 +431,10 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 //
 - (void)peripheral:(CBPeripheral *)peripheral didDiscoverServices:(NSError *)error {
   NSLog(@"didDiscoverServices");
+  // Send negotiated mtu size
+  uint32_t mtu = [self getMtu:peripheral];
+  [_channel invokeMethod:@"MtuSize" arguments:[self toFlutterData:[self toMtuSizeResponseProto:peripheral mtu:mtu]]];
+  
   // Loop through and discover characteristics and secondary services
   [_servicesThatNeedDiscovered addObjectsFromArray:peripheral.services];
   for(CBService *s in [peripheral services]) {
@@ -502,7 +519,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 }
 
 - (void)peripheral:(CBPeripheral *)peripheral didReadRSSI:(NSNumber *)RSSI error:(NSError *)error {
-    NSLog(@"iOS信号强度: %@", RSSI);    
+    NSLog(@"iOS信号强度: %@", RSSI);
     NSString *remoteId = [peripheral.identifier UUIDString];
     FlutterResult result = _rssiResults[remoteId];
     if(result){
@@ -754,6 +771,12 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
   return result;
 }
 
+- (ProtosMtuSizeResponse*)toMtuSizeResponseProto:(CBPeripheral *)peripheral mtu:(uint32_t)mtu {
+  ProtosMtuSizeResponse *result = [[ProtosMtuSizeResponse alloc] init];
+  [result setRemoteId:[[peripheral identifier] UUIDString]];
+  [result setMtu:mtu];
+  return result;
+}
 
 - (void)log:(LogLevel)level format:(NSString *)format, ... {
   if(level <= _logLevel) {
@@ -762,6 +785,16 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 //    NSString* formattedMessage = [[NSString alloc] initWithFormat:format arguments:args];
     NSLog(format, args);
     va_end(args);
+  }
+}
+
+- (uint32_t)getMtu:(CBPeripheral *)peripheral {
+  if (@available(iOS 9.0, *)) {
+    // Which type should we use? (issue #365)
+    return (uint32_t)[peripheral maximumWriteValueLengthForType:CBCharacteristicWriteWithoutResponse];
+  } else {
+    // Fallback to minimum on earlier versions. (issue #364)
+    return 20;
   }
 }
 
