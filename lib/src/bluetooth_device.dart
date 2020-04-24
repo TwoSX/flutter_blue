@@ -53,6 +53,11 @@ class BluetoothDevice {
 
   /// Discovers services offered by the remote device as well as their characteristics and descriptors
   Future<List<BluetoothService>> discoverServices() async {
+    final s = await state.first;
+    if (s != BluetoothDeviceState.connected) {
+      return Future.error(new Exception(
+          'Cannot discoverServices while device is not connected. State == $s'));
+    }
     var response = FlutterBlue.instance._methodStream
         .where((m) => m.method == "DiscoverServicesResult")
         .map((m) => m.arguments)
@@ -142,10 +147,15 @@ class BluetoothDevice {
   int get hashCode => id.hashCode;
 
   /// 读取已连接设备的Rssi
-  Future<int> redRssi(){
+  Future<int> redRssi() {
     return FlutterBlue.instance._channel
         .invokeMethod('readRssi', id.toString())
         .then((o) => o as int);
+  }
+
+  @override
+  String toString() {
+    return 'BluetoothDevice{id: $id, name: $name, type: $type, isDiscoveringServices: ${_isDiscoveringServices?.value}, _services: ${_services?.value}';
   }
 }
 
