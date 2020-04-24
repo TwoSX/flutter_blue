@@ -728,6 +728,8 @@ public class FlutterBluePlugin implements FlutterPlugin, ActivityAware, MethodCa
                             BluetoothAdapter.ERROR);
                     switch (state) {
                         case BluetoothAdapter.STATE_OFF:
+                            // 系统蓝牙关闭时清空数据，避免重新开启蓝牙后重新连接设备出现设备已连接错误
+                            mDevices.clear();
                             sink.success(Protos.BluetoothState.newBuilder().setState(Protos.BluetoothState.State.OFF).build().toByteArray());
                             break;
                         case BluetoothAdapter.STATE_TURNING_OFF:
