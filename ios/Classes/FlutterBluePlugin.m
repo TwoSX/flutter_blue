@@ -206,6 +206,17 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         NSString *remoteId = [call arguments];
         @try {
             CBPeripheral *peripheral = [self findPeripheral:remoteId];
+            CBPeripheral *removeConnectpheral;
+            for (CBPeripheral *aperipheral in self.connectPeripherals) {
+                if ([[[aperipheral identifier] UUIDString] isEqualToString:[[peripheral identifier] UUIDString]]){
+                    removeConnectpheral = aperipheral;
+                    break;;
+                }
+            }
+            if (removeConnectpheral) {
+                [self.connectPeripherals removeObject:removeConnectpheral];
+            }
+            
             [_centralManager cancelPeripheralConnection:peripheral];
             result(nil);
         } @catch(FlutterError *e) {
